@@ -1,0 +1,83 @@
+install.packages("googlesheets4")
+library(googlesheets4)
+gs4_deauth() 
+htaindexIL <- read_sheet("https://docs.google.com/spreadsheets/d/1ad0gbYH9zChowPd7i5jTTEt8qhORQGdWb2zuMdYQV1E/edit?usp=sharing")
+htaindexIL$cbsa <- str_remove_all(htaindexIL$cbsa, "\"")
+peoria_hta <- subset(htaindexIL, cbsa=="Peoria, IL") ##Data dictionary for HTA https://htaindex.cnt.org/download/data-dictionary.php 
+
+
+peoria_hta <- peoria_hta  %>%
+  mutate(t_amibi = ifelse(t_ami > 20, "1", "0")) %>% ##create binary variable out of t-cost burdened for those spending over 20% on transportation (the cut off is 15%, but not enough are spending less than that)
+  mutate(h_amibi = ifelse(h_ami > 27, "1", "0")) %>% ##create binary variable out of h-cost burden for those spending over 27% on housing (The cut off is 30%, but not enough are  spending more than that)
+  mutate(tbrdn_cat = cut(t_ami, breaks=c(-Inf, 20, 25, Inf), labels=c("<20", "20-25", ">25"))) %>% ##create categorical variable out of t-cost burden
+  mutate(hbrdn_cat = cut(h_ami, breaks=c(-Inf, 27, 40, Inf), labels=c("<27", "27-40", ">40"))) %>% ##create categorical variable out of h-cost burden (I didn't do extrememly cost-burdened (>50% because there weren't enough)
+  mutate(t_80amibi = ifelse(t_80ami > 20, "1", "0")) %>% ##create binary variable out of t-cost burdened for those spending over 20% on transportation (the cut off is 15%, but not enough are spending less than that)
+  mutate(h_80amibi = ifelse(h_80ami > 27, "1", "0")) %>% ##create binary variable out of h-cost burden for those spending over 28% on housing (The cut off is 30%, but not enough are  spending more than that)
+  mutate(tbrdn_80cat = cut(t_80ami, breaks=c(-Inf, 20, 25, Inf), labels=c("<20", "20-25", ">25"))) %>% ##create categorical variable out of t-cost burden
+  mutate(hbrdn_80cat = cut(h_80ami, breaks=c(-Inf, 27, 40, Inf), labels=c("<27", "27-40", ">40"))) %>%
+  mutate(renter_cat = cut(pct_renter_occupied_hu, breaks=c(-Inf, 25, 50, Inf), labels=c("low % renter", "med % renter", "high % renter"))) %>%
+  na.omit(peoria_hta) %>%
+  mutate(blkgrp1 = ifelse(blkgrp >1, blkgrp, NA))
+   
+##AMI Tables, Plots, Chisquare, and RegressionAMI##
+
+ds_freq_table(peoria_hta, tbrdn_cat)
+ds_freq_table(peoria_hta, hbrdn_cat)
+ggplot(data = peoria_hta, mapping = aes(x = tbrdn_cat, y = h_ami)) + 
+  geom_boxplot()
+
+tbrdnhbrdn <- table(peoria_hta$tbrdn_cat, peoria_hta$h_amibi) 
+round(100*prop.table(tbrdnhbrdn,2),2) 
+chisq.test(tbrdnhbrdn) ##Not sure why it gets an error
+
+lmtbrdn_hcont <- lm(t_ami ~ h_ami, data = peoria_hta)
+summary(lmtbrdn_hcont)
+deviance(lmtbrdn_hcont)
+plot (lmtbrdn_hcont)
+
+lmtbrdn_hcat <- lm(t_ami ~ hbrdn_cat, data = peoria_hta)
+summary(lmtbrdn_hcat)
+deviance(lmtbrdn_hcat)
+plot (lmtbrdn_hcat)
+
+lmhbrdn_tcont <- lm(h_ami ~ t_ami, data = peoria_hta)
+summary(lmhbrdn_tcont)
+deviance(lmhbrdn_tcont)
+plot (lmhbrdn_tcont)
+
+lmhbrdn_tcat <- lm(h_ami ~ tbrdn_cat, data = peoria_hta)
+summary(lmhbrdn_tcat)
+deviance(lmhbrdn_tcat)
+plot (lmhbrdn_tcat)
+
+
+##80AMI Tables, Plots, Chisquare, and Regression 80AMI##
+
+ds_freq_table(peoria_hta, tbrdn_80cat)
+ds_freq_table(peoria_hta, hbrdn_80cat)
+ggplot(data = peoria_hta, mapping = aes(x = tbrdn_80cat, y = h_80ami)) + 
+  geom_boxplot()
+
+tbrdnhbrdn80 <- table(peoria_hta$tbrdn_80cat, peoria_hta$h_80amibi) 
+round(100*prop.table(tbrdnhbrdn80,2),2) 
+chisq.test(tbrdnhbrdn80) ##Not sure why it gets an error
+
+lmtbrdn_80hcont <- lm(t_80ami ~ h_80ami, data = peoria_hta)
+summary(lmtbrdn_80hcont)
+deviance(lmtbrdn_80hcont)
+plot (lmtbrdn_80hcont)
+
+lmtbrdn_80hcat <- lm(t_80ami ~ hbrdn_80cat, data = peoria_hta)
+summary(lmtbrdn_80hcat)
+deviance(lmtbrdn_80hcat)
+plot (lmtbrdn_80hcat)
+
+lmhbrdn_80tcont <- lm(h_80ami ~ t_80ami, data = peoria_hta)
+summary(lmhbrdn_80tcont)
+deviance(lmhbrdn_80tcont)
+plot (lmhbrdn_80tcont)
+
+lmhbrdn_80tcat <- lm(h_80ami ~ tbrdn_80cat, data = peoria_hta)
+summary(lmhbrdn_80tcat)
+deviance(lmhbrdn_80tcat)
+plot (lmhbrdn_80tcat)
